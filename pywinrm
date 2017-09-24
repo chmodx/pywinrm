@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+
+import os, sys, getopt
+
+import argparse
+
+from winrm.protocol import Protocol
+from enum import Enum
+
+list_of_auth = ['basic', 'plaintext', 'certificate', 'kerberos', 'ntlm']
+list_of_schema = ['http', 'https']
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument('-H', '--hostname', dest='hostname', required=True, 
+                    help='Host name, IP Address')
+parser.add_argument('-s', '--schema', choices=list_of_schema, dest='schema', default='http', 
+                    help='connect using the indicated schema http(s)')
+parser.add_argument('-u', '--username', dest='username', required=True, 
+                    help='connect using the indicated username')
+parser.add_argument('-p', '--password', dest='password', required=True, 
+                    help='use the password to authenticate the connection')
+parser.add_argument('-P', '--port', dest='port', type=int, default=5985, 
+                    help='connect using the indicated port')
+parser.add_argument('-a', '--auth', choices=list_of_auth, dest='auth', default='ntlm', 
+                    help='use the auth to authentication method')
+parser.add_argument('-c', '--command', action='append', dest='commands',
+                    default=[],
+                    help='Add repeated command to a list like as -c command1 -c command2',
+                    )
+parser.add_argument('-V', '--version', action='version', 
+                    version='%(prog)s 1.0')
+
+args = parser.parse_args()
+
+p = Protocol(endpoint=args.schema + '://' + args.hostname + ':' + str(args.port) + '/wsman',
+             transport=args.auth, username=args.username, password=args.password,
+             server_cert_validation='ignore')
+shell_id = p.open_shell()
+
+for command in args.commands:
+    
+    command_id = p.run_command(shell_id, command)
+    std_out, std_err, status_code = p.get_command_output(shell_id, command_id)
+    print std_out
+    p.cleanup_command(shell_id, command_id)
+
+p.close_shell(shell_id)
+
